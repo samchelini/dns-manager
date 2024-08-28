@@ -5,7 +5,8 @@
 2. Run server with `go run .`
 
 ## API Endpoints
-`/records`: Currently only returns all A records for a domain
+### /records
+Currently only returns all A records for a domain
 
 | Parameter | Required | Description |
 | :--- | :--- | :--- |
@@ -13,5 +14,5 @@
 
 Example:
 ```http
-GET /records?domain=local.domain
+GET /records?domain=local.domain.
 ```
