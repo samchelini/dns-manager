@@ -9,6 +9,7 @@ import (
     "encoding/json"
     "github.com/gin-gonic/gin"
     "net/http"
+    "os"
 )
 
 type ARecord struct {
@@ -33,7 +34,7 @@ func getRecords(c *gin.Context) {
 
     // send request
     log.Println("sending request...")
-    conn, err := net.Dial("tcp", "ns1.internal.chelini.io:53")
+    conn, err := net.Dial("tcp", os.Getenv("DNS_SERVER"))
     if err != nil {
         log.Fatalf("error creating connection: %s", err)
     }
@@ -142,6 +143,9 @@ func newAxfrQuery(domain string) []byte {
 }
 
 func main() {
+    if os.Getenv("DNS_SERVER") == "" {
+        log.Fatal("error: DNS_SERVER env var not set")
+    }
     router := gin.Default()
     router.GET("/records", getRecords)
 
