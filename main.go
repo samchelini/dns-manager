@@ -6,7 +6,6 @@ import (
     "golang.org/x/net/dns/dnsmessage"
     "crypto/rand"
     "encoding/binary"
-    "encoding/json"
     "github.com/gin-gonic/gin"
     "net/http"
     "os"
@@ -22,8 +21,12 @@ func getRecords(c *gin.Context) {
     domain := c.Query("domain")
     log.Println("building message...")
 
-    log.Println(domain)
-    query := newAxfrQuery(domain)
+    log.Printf("domain: %s", domain)
+    query, err := newAxfrQuery(domain)
+    if err != nil {
+        log.Println(err)
+        return
+    }
 
     length := make([]byte, 2)
     binary.BigEndian.PutUint16(length, uint16(len(query)))
@@ -94,8 +97,6 @@ func getRecords(c *gin.Context) {
             p.SkipAnswer()
         }
 	}
-    j, _ := json.MarshalIndent(aRecords, "", "  ")
-    log.Printf("printing json...\n%s", string(j))
     c.IndentedJSON(http.StatusOK, aRecords)
 }
 
@@ -109,7 +110,7 @@ func generateId() []byte {
     return id
 }
 
-func newAxfrQuery(domain string) []byte {
+func newAxfrQuery(domain string) ([]byte, error) {
     buf := make([]byte, 0)
     b := dnsmessage.NewBuilder(buf, dnsmessage.Header{
         ID: binary.BigEndian.Uint16(generateId()), 
@@ -131,7 +132,8 @@ func newAxfrQuery(domain string) []byte {
         },
     )
     if err != nil {
-        log.Fatalf("error adding question: %s", err)
+        log.Println("error adding question")
+        return nil, err
     }
 
     query, err := b.Finish()
@@ -139,7 +141,7 @@ func newAxfrQuery(domain string) []byte {
         log.Fatalf("error building message: %s", err)
     }
 
-    return query
+    return query, err
 }
 
 func main() {
