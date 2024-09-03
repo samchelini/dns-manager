@@ -48,7 +48,7 @@ func NewAxfrQuery(domain string) ([]byte, error) {
         },
     )
     if err != nil {
-        log.Println("error adding question")
+        log.Printf("error adding question: %s", err)
         return nil, err
     }
 

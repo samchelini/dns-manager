@@ -8,21 +8,29 @@ import (
     "github.com/samchelini/dns-manager/dns"
 )
 
+type Response[T any] struct {
+    Resources []T
+    Error *string
+}
 
 func getRecords(c *gin.Context) {
+    res := Response[dns.Record]{}
     domain := c.Query("domain")
     log.Printf("domain: %s", domain)
 
     log.Println("building message...")
     query, err := dns.NewAxfrQuery(domain)
     if err != nil {
-        log.Println(err)
+        s := err.Error()
+        res.Error = &s
+        c.IndentedJSON(http.StatusBadRequest, res)
         return
     }
 
     answer := dns.SendQuery(query, os.Getenv("DNS_SERVER"))
     records := dns.GetRecords(answer)
-    c.IndentedJSON(http.StatusOK, records)
+    res.Resources = records
+    c.IndentedJSON(http.StatusOK, res)
 }
 
 
