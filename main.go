@@ -11,9 +11,9 @@ import (
 
 func getRecords(c *gin.Context) {
     domain := c.Query("domain")
-    log.Println("building message...")
-
     log.Printf("domain: %s", domain)
+
+    log.Println("building message...")
     query, err := dns.NewAxfrQuery(domain)
     if err != nil {
         log.Println(err)
