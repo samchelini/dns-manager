@@ -6,6 +6,7 @@ import (
     "crypto/rand"
     "encoding/binary"
     "golang.org/x/net/dns/dnsmessage"
+    "time"
 )
 
 type ARecord struct {
@@ -68,7 +69,7 @@ func SendQuery(query []byte, nameserver string) []byte {
 
     // send request
     log.Println("sending request...")
-    conn, err := net.Dial("tcp", nameserver)
+    conn, err := net.DialTimeout("tcp", nameserver, 5 * time.Second)
     if err != nil {
         log.Fatalf("error creating connection: %s", err)
     }
