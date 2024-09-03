@@ -1,5 +1,4 @@
 package dns
-
 import (
     "log"
     "net"
@@ -9,10 +8,12 @@ import (
     "time"
 )
 
-type ARecord struct {
-    Type string
-    Name string
-    Address string
+type Record struct {
+    Name  string
+    Type  string
+    Class string
+    TTL   uint32
+    Data map[string]interface{}
 }
 
 // generate random 2 byte ID
@@ -89,7 +90,7 @@ func SendQuery(query []byte, nameserver string) []byte {
     return answer
 }
 
-func GetRecords(answer []byte) []ARecord {
+func GetRecords(answer []byte) []Record {
     // parse answer
     log.Println("parsing answer...")
     var p dnsmessage.Parser
@@ -101,37 +102,59 @@ func GetRecords(answer []byte) []ARecord {
         log.Fatalf("error skipping questions: %s", err)
     }
 
-    log.Println("parsing answer headers...")
-    var aRecords []ARecord
+    log.Println("parsing answers...")
+    //recs, err := p.AllAnswers()
+    var records []Record
     for {
-        h, err := p.AnswerHeader()
-        if err == dnsmessage.ErrSectionDone {
-            break
-        }
-        if err != nil {
-            log.Fatalf("error parsing answer header: %s", err)
-        }
+		h, err := p.AnswerHeader()
+		if err == dnsmessage.ErrSectionDone {
+			break
+		}
+		if err != nil {
+			log.Fatalf("error parsing answer: %s", err)
+		}
 
-        if h.Type == dnsmessage.TypeA {
-            r, err := p.AResource()
-            if err != nil {
-                log.Fatalf("error parsing A resource: %s", err)
-            }
-            rType := h.Type.String()
-            rName := h.Name.String()
-            rAddr := net.IPv4(r.A[0], r.A[1], r.A[2], r.A[3]).String()
-            rec := ARecord{
-                Type: rType,
-                Name: rName,
-                Address: rAddr,
-            }
-            aRecords = append(aRecords, rec)
-            log.Printf("type: %s", h.Type.String())
-            log.Printf("name: %s", h.Name.String())
-            log.Printf("addr: %s", net.IPv4(r.A[0], r.A[1], r.A[2], r.A[3]).To4())
-        } else {
-            p.SkipAnswer()
+        rec := Record {
+            Name: h.Name.String(),
+            Type: h.Type.String(),
+            Class: h.Class.String(),
+            TTL: h.TTL,
+            Data: make(map[string]interface{}),
         }
-    }
-    return aRecords
+        
+		switch h.Type {
+		case dnsmessage.TypeA:
+			r, err := p.AResource()
+			if err != nil {
+				log.Fatalf("error parsing A Record: %s", err)
+			}
+			rec.Data["Address"] = net.IP(r.A[:]).To4()
+            records = append(records, rec)
+        case dnsmessage.TypeSOA:
+            r, err := p.SOAResource()
+            if err != nil {
+                log.Fatalf("error parsing SOA Record: %s", err)
+            }
+            rec.Data["NS"] = r.NS.String()
+            rec.Data["MBox"] = r.MBox.String()
+            rec.Data["Serial"] = r.Serial
+            rec.Data["Refresh"] = r.Refresh
+            rec.Data["Retry"] = r.Retry
+            rec.Data["Expire"] = r.Expire
+            rec.Data["MinTTL"] = r.MinTTL
+            records = append(records, rec)
+        case dnsmessage.TypeNS:
+            r, err := p.NSResource()
+            if err != nil {
+                log.Fatalf("error parsing NS Record: %s", err)
+            }
+            rec.Data["NS"] = r.NS.String()
+            records = append(records, rec)
+        default:
+            records = append(records, rec)
+            p.SkipAnswer()
+		}
+	}
+
+    return records
 }
