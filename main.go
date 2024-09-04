@@ -9,8 +9,8 @@ import (
 )
 
 type Response[T any] struct {
-    Resources []T
-    Error *string
+    Resources   []T     `json:"resources"`
+    Error       *string `json:"error"`  
 }
 
 func getRecords(c *gin.Context) {

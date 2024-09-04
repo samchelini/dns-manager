@@ -9,11 +9,11 @@ import (
 )
 
 type Record struct {
-    Name  string
-    Type  string
-    Class string
-    TTL   uint32
-    Data map[string]interface{}
+    Name    string                  `json:"name"`
+    Type    string                  `json:"type"`
+    Class   string                  `json:"class"`
+    TTL     uint32                  `json:"ttl"`
+    Data    map[string]interface{}  `json:"data"`
 }
 
 // generate random 2 byte ID
@@ -128,27 +128,27 @@ func GetRecords(answer []byte) []Record {
 			if err != nil {
 				log.Fatalf("error parsing A Record: %s", err)
 			}
-			rec.Data["Address"] = net.IP(r.A[:]).To4()
+			rec.Data["address"] = net.IP(r.A[:]).To4()
             records = append(records, rec)
         case dnsmessage.TypeSOA:
             r, err := p.SOAResource()
             if err != nil {
                 log.Fatalf("error parsing SOA Record: %s", err)
             }
-            rec.Data["NS"] = r.NS.String()
-            rec.Data["MBox"] = r.MBox.String()
-            rec.Data["Serial"] = r.Serial
-            rec.Data["Refresh"] = r.Refresh
-            rec.Data["Retry"] = r.Retry
-            rec.Data["Expire"] = r.Expire
-            rec.Data["MinTTL"] = r.MinTTL
+            rec.Data["ns"] = r.NS.String()
+            rec.Data["mBox"] = r.MBox.String()
+            rec.Data["serial"] = r.Serial
+            rec.Data["refresh"] = r.Refresh
+            rec.Data["retry"] = r.Retry
+            rec.Data["expire"] = r.Expire
+            rec.Data["minTtl"] = r.MinTTL
             records = append(records, rec)
         case dnsmessage.TypeNS:
             r, err := p.NSResource()
             if err != nil {
                 log.Fatalf("error parsing NS Record: %s", err)
             }
-            rec.Data["NS"] = r.NS.String()
+            rec.Data["ns"] = r.NS.String()
             records = append(records, rec)
         default:
             records = append(records, rec)
