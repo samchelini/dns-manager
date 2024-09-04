@@ -2,10 +2,10 @@ package main
 
 import ( 
     "log"
-    "github.com/gin-gonic/gin"
     "net/http"
     "os"
     "github.com/samchelini/dns-manager/dns"
+    "encoding/json"
 )
 
 type Response[T any] struct {
@@ -13,24 +13,26 @@ type Response[T any] struct {
     Error       *string `json:"error"`  
 }
 
-func getRecords(c *gin.Context) {
-    res := Response[dns.Record]{}
-    domain := c.Query("domain")
+func getRecords(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    response := Response[dns.Record]{}
+    domain := r.FormValue("domain")
     log.Printf("domain: %s", domain)
 
     log.Println("building message...")
     query, err := dns.NewAxfrQuery(domain)
     if err != nil {
-        s := err.Error()
-        res.Error = &s
-        c.IndentedJSON(http.StatusBadRequest, res)
-        return
+        errString := err.Error()
+        response.Error = &errString
+        w.WriteHeader(http.StatusBadRequest)
+    } else {
+        answer := dns.SendQuery(query, os.Getenv("DNS_SERVER"))
+        records := dns.GetRecords(answer)
+        response.Resources = records
+        w.WriteHeader(http.StatusOK)
     }
 
-    answer := dns.SendQuery(query, os.Getenv("DNS_SERVER"))
-    records := dns.GetRecords(answer)
-    res.Resources = records
-    c.IndentedJSON(http.StatusOK, res)
+    json.NewEncoder(w).Encode(response)
 }
 
 
@@ -38,9 +40,9 @@ func main() {
     if os.Getenv("DNS_SERVER") == "" {
         log.Fatal("error: DNS_SERVER env var not set")
     }
-    router := gin.Default()
-    router.GET("/records", getRecords)
 
-    router.Run("0.0.0.0:8080")
+    http.HandleFunc("/api/v1/records", getRecords)
+    log.Println("listening on port 8080...")
+    log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
