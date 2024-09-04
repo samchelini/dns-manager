@@ -150,6 +150,13 @@ func GetRecords(answer []byte) []Record {
             }
             rec.Data["ns"] = r.NS.String()
             records = append(records, rec)
+        case dnsmessage.TypePTR:
+            r, err := p.PTRResource()
+            if err != nil {
+                log.Fatalf("error parsing PTR Record: %s", err)
+            }
+            rec.Data["ptr"] = r.PTR.String()
+            records = append(records, rec)
         default:
             records = append(records, rec)
             p.SkipAnswer()
