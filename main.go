@@ -27,7 +27,7 @@ func getRecords(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(http.StatusBadRequest)
     } else {
         answer := dns.SendQuery(query, os.Getenv("DNS_SERVER"))
-        records := dns.GetRecords(answer)
+        records := dns.GetAllRecords(answer)
         response.Resources = records
         w.WriteHeader(http.StatusOK)
     }
