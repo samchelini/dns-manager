@@ -15,14 +15,17 @@ type Response[T any] struct {
     Error       *string `json:"error"`  
 }
 
+// get all records from a zone
 func getRecords(w http.ResponseWriter, r *http.Request) {
+    // set headers and get zone from path
     w.Header().Set("Content-Type", "application/json")
     response := Response[dns.Record]{}
-    domain := r.FormValue("domain")
-    log.Printf("domain: %s", domain)
+    zone := r.PathValue("zone")
+    log.Printf("zone: %s", zone)
 
+    // build and send query
     log.Println("building message...")
-    query, err := dns.NewAxfrQuery(domain)
+    query, err := dns.NewAxfrQuery(zone)
     if err != nil {
         errString := err.Error()
         response.Error = &errString
@@ -34,6 +37,7 @@ func getRecords(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(http.StatusOK)
     }
 
+    // return response
     json.NewEncoder(w).Encode(response)
 }
 
@@ -96,7 +100,7 @@ func main() {
         }
     }
 
-    http.HandleFunc("GET /api/v1/records", getRecords)
+    http.HandleFunc("GET /api/v1/records/{zone}", getRecords)
     http.HandleFunc("POST /api/v1/records/{zone}", updateRecord)
     http.HandleFunc("DELETE /api/v1/records/{zone}", updateRecord)
     log.Println("listening on port 8080...")
