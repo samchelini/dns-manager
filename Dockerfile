@@ -9,6 +9,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY *.go ./
+COPY dns ./dns
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /dns-manager
 
