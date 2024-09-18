@@ -6,9 +6,14 @@ import (
     "os"
     "github.com/samchelini/dns-manager/dns"
     "encoding/json"
+    "fmt"
 )
 
-var tsig dns.TSIG
+// global variables
+var (
+    port = "8080" // default port
+    tsig dns.TSIG // tsig data
+)
 
 type Response[T any] struct {
     Resources   []T     `json:"resources"`
@@ -75,35 +80,66 @@ func updateRecord(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(response)
 }
 
-func main() {
-    // check env vars
-    if (os.Getenv("DNS_SERVER") == "") {
-        log.Fatal("error: DNS_SERVER env var not set")
+func parseEnv() error {
+    // get env vars
+    p := os.Getenv("PORT")
+    dnsServer := os.Getenv("DNS_SERVER")
+    tsigFile := os.Getenv("TSIG_FILE")
+
+    // store any missing required env vars here
+    missing := make([]string, 0)
+
+    // check required env vars
+    if dnsServer == "" {
+        missing = append(missing, "DNS_SERVER")
     }
-    if (os.Getenv("TSIG_FILE") == "") {
-        log.Fatal("error: TSIG_FILE env var not set")
+    if tsigFile == "" {
+        missing = append(missing, "TSIG_FILE")
+    }
+    if len(missing) != 0 {
+        missingString, _ := json.Marshal(missing)
+        return fmt.Errorf("required env vars are missing: %s", missingString)
+    }
+
+    // try to open TSIG file
+    _, err := os.Open(tsigFile)
+    if err != nil {
+        return fmt.Errorf("error opening TSIG_FILE: %s", err)
+    }
+
+    // try to read TSIG file
+    tsigData, err := os.ReadFile(tsigFile)
+    if err != nil {
+        return fmt.Errorf("error reading TSIG_FILE: %s", err)
+    }
+
+    // try to unmarshal TSIG data to TSIG object
+    err = json.Unmarshal(tsigData, &tsig)
+    if err != nil {
+        return fmt.Errorf("error unmarshalling TSIG_FILE: %s", err)
+    }
+
+    // check PORT
+    if p == "" {
+        log.Printf("PORT env var is not set, using default port %s", port)
     } else {
-        // try to open file
-        _, err := os.Open(os.Getenv("TSIG_FILE"))
-        if err != nil {
-            log.Fatalf("error opening TSIG_FILE: %s", err)
-        }
-        // try to read file
-        tsigData, err := os.ReadFile(os.Getenv("TSIG_FILE"))
-        if err != nil {
-            log.Fatalf("error reading TSIG_FILE: %s", err)
-        }
-        // try to unmarshal to TSIG object
-        err = json.Unmarshal(tsigData, &tsig)
-        if err != nil {
-            log.Fatalf("error unmarshalling TSIG_FILE: %s", err)
-        }
+        log.Printf("PORT env var is set to: %s", p)
+        port = p
+    }
+
+    return nil
+}
+
+func main() {
+    // parse environment variables
+    err := parseEnv()
+    if err != nil {
+        log.Fatalf("error parsing env vars: %s", err)
     }
 
     http.HandleFunc("GET /api/v1/records/{zone}", getRecords)
     http.HandleFunc("POST /api/v1/records/{zone}", updateRecord)
     http.HandleFunc("DELETE /api/v1/records/{zone}", updateRecord)
-    log.Println("listening on port 8080...")
-    log.Fatal(http.ListenAndServe(":8080", nil))
+    log.Printf("listening on port %s ...", port)
+    log.Fatal(http.ListenAndServe(":" + port, nil))
 }
-
