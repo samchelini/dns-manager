@@ -11,13 +11,20 @@ import (
 
 // global variables
 var (
-    port = "8080" // default port
-    tsig dns.TSIG // tsig data
+    port = "8080"   // default port
+    tsig dns.TSIG   // tsig data
 )
 
 type Response[T any] struct {
     Resources   []T     `json:"resources"`
     Error       *string `json:"error"`  
+}
+
+type ResponseV2[T any] struct {
+    Status      string  `json:"status"`
+    Data        T       `json:"data"`
+    Message     *string `json:"message,omitempty"`
+    Code        *int    `json:"code,omitempty"`
 }
 
 // get all records from a zone
@@ -39,6 +46,34 @@ func getRecords(w http.ResponseWriter, r *http.Request) {
         answer := dns.SendQuery(query, os.Getenv("DNS_SERVER"))
         records := dns.GetAllRecords(answer)
         response.Resources = records
+        w.WriteHeader(http.StatusOK)
+    }
+
+    // return response
+    json.NewEncoder(w).Encode(response)
+}
+
+// get all records from a zone (v2)
+func getRecordsV2(w http.ResponseWriter, r *http.Request) {
+    // set headers and get zone from path
+    w.Header().Set("Content-Type", "application/json")
+    response := ResponseV2[[]dns.Record]{}
+    zone := r.PathValue("zone")
+    log.Printf("zone: %s", zone)
+
+    // build and send query
+    log.Println("building message...")
+    query, err := dns.NewAxfrQuery(zone)
+    if err != nil {
+        response.Status = "error"
+        errString := err.Error()
+        response.Message = &errString
+        w.WriteHeader(http.StatusBadRequest)
+    } else {
+        response.Status = "success"
+        answer := dns.SendQuery(query, os.Getenv("DNS_SERVER"))
+        records := dns.GetAllRecords(answer)
+        response.Data = records
         w.WriteHeader(http.StatusOK)
     }
 
@@ -138,6 +173,7 @@ func main() {
     }
 
     http.HandleFunc("GET /api/v1/records/{zone}", getRecords)
+    http.HandleFunc("GET /api/v2/records/{zone}", getRecordsV2)
     http.HandleFunc("POST /api/v1/records/{zone}", updateRecord)
     http.HandleFunc("DELETE /api/v1/records/{zone}", updateRecord)
     log.Printf("listening on port %s ...", port)
