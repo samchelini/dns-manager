@@ -5,6 +5,7 @@ import (
     "net/http"
     "os"
     "github.com/samchelini/dns-manager/dns"
+    "github.com/samchelini/dns-manager/jsend"
     "encoding/json"
     "fmt"
 )
@@ -53,6 +54,12 @@ func getRecords(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(response)
 }
 
+func sendResponse(writer http.ResponseWriter, response *jsend.Response) {
+    writer.Header().Set("Content-Type", "application/json")
+    writer.WriteHeader(response.HttpCode)
+    json.NewEncoder(writer).Encode(response)
+}
+
 // get all records from a zone (v2)
 func getRecordsV2(w http.ResponseWriter, r *http.Request) {
     // set headers and get zone from path
@@ -63,19 +70,24 @@ func getRecordsV2(w http.ResponseWriter, r *http.Request) {
 
     // build and send query
     log.Println("building message...")
-    query, err := dns.NewAxfrQuery(zone)
+    query, err := dns.NewAxfrQueryV2(zone)
     if err != nil {
-        response.Status = "error"
-        errString := err.Error()
-        response.Message = &errString
-        w.WriteHeader(http.StatusBadRequest)
-    } else {
-        response.Status = "success"
-        answer := dns.SendQuery(query, os.Getenv("DNS_SERVER"))
-        records := dns.GetAllRecords(answer)
-        response.Data = records
-        w.WriteHeader(http.StatusOK)
+        sendResponse(w, err)
+        return
     }
+    response.Status = "success"
+    answer, err := dns.SendQueryV2(query, os.Getenv("DNS_SERVER"))
+    if err != nil {
+        sendResponse(w, err)
+        return
+    }
+    records, err := dns.GetAllRecordsV2(answer)
+    if err != nil {
+        sendResponse(w, err)
+        return
+    }
+    response.Data = records
+    w.WriteHeader(http.StatusOK)
 
     // return response
     json.NewEncoder(w).Encode(response)
