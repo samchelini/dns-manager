@@ -28,6 +28,21 @@ type ResponseV2[T any] struct {
     Code        *int    `json:"code,omitempty"`
 }
 
+// logs http requests
+func logHandler(handler http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        log.Printf("received request: %s %s %s", r.RemoteAddr, r.Method, r.URL)
+	handler.ServeHTTP(w, r)
+    })
+}
+
+// sets headers, encodes, and sends response
+func sendResponse(writer http.ResponseWriter, response *jsend.Response) {
+    writer.Header().Set("Content-Type", "application/json")
+    writer.WriteHeader(response.HttpCode)
+    json.NewEncoder(writer).Encode(response)
+}
+
 // get all records from a zone
 func getRecords(w http.ResponseWriter, r *http.Request) {
     // set headers and get zone from path
@@ -54,17 +69,10 @@ func getRecords(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(response)
 }
 
-func sendResponse(writer http.ResponseWriter, response *jsend.Response) {
-    writer.Header().Set("Content-Type", "application/json")
-    writer.WriteHeader(response.HttpCode)
-    json.NewEncoder(writer).Encode(response)
-}
-
 // get all records from a zone (v2)
 func getRecordsV2(w http.ResponseWriter, r *http.Request) {
     // set headers and get zone from path
     w.Header().Set("Content-Type", "application/json")
-    response := ResponseV2[[]dns.Record]{}
     zone := r.PathValue("zone")
     log.Printf("zone: %s", zone)
 
@@ -75,22 +83,21 @@ func getRecordsV2(w http.ResponseWriter, r *http.Request) {
         sendResponse(w, err)
         return
     }
-    response.Status = "success"
     answer, err := dns.SendQueryV2(query, os.Getenv("DNS_SERVER"))
     if err != nil {
         sendResponse(w, err)
         return
     }
+
+    // get list of records from answer
     records, err := dns.GetAllRecordsV2(answer)
     if err != nil {
         sendResponse(w, err)
         return
     }
-    response.Data = records
-    w.WriteHeader(http.StatusOK)
 
-    // return response
-    json.NewEncoder(w).Encode(response)
+    // send successful response
+    sendResponse(w, jsend.Success(records, nil, nil, http.StatusOK))
 }
 
 // create or delete dns record in a zone
@@ -189,5 +196,5 @@ func main() {
     http.HandleFunc("POST /api/v1/records/{zone}", updateRecord)
     http.HandleFunc("DELETE /api/v1/records/{zone}", updateRecord)
     log.Printf("listening on port %s ...", port)
-    log.Fatal(http.ListenAndServe(":" + port, nil))
+    log.Fatal(http.ListenAndServe(":" + port, logHandler(http.DefaultServeMux)))
 }

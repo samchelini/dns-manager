@@ -19,11 +19,11 @@ type Response struct {
 }
 
 // create jsend success response
-func Success(data any, err string, code *int, httpCode int) *Response {
+func Success(data any, err *string, code *int, httpCode int) *Response {
     return &Response{
         Status:     SuccessStatus,
         Data:       data,
-        Message:    &err,
+        Message:    err,
         Code:       code,
         HttpCode:   httpCode,
     }
