@@ -6,6 +6,7 @@ import (
     "os"
     "github.com/samchelini/dns-manager/dns"
     "github.com/samchelini/dns-manager/jsend"
+    "github.com/samchelini/dns-manager/uuid"
     "encoding/json"
     "fmt"
 )
@@ -32,7 +33,8 @@ type ResponseV2[T any] struct {
 func logHandler(handler http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         log.Printf("received request: %s %s %s", r.RemoteAddr, r.Method, r.URL)
-	handler.ServeHTTP(w, r)
+        w.Header().Set("X-Request-ID", uuid.V4())
+	    handler.ServeHTTP(w, r)
     })
 }
 
