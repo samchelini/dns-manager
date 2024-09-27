@@ -9,6 +9,8 @@ import (
     "github.com/samchelini/dns-manager/uuid"
     "encoding/json"
     "fmt"
+    "strings"
+    "time"
 )
 
 // global variables
@@ -16,6 +18,28 @@ var (
     port = "8080"   // default port
     tsig dns.TSIG   // tsig data
 )
+
+// extend http.ResponseWriter to include response code and bytes sent
+type extendedResponseWriter struct {
+    w http.ResponseWriter
+    statusCode int
+    bytes int
+}
+
+func (erw *extendedResponseWriter) Header() http.Header {
+    return erw.w.Header()
+}
+
+func (erw *extendedResponseWriter) WriteHeader(statusCode int) {
+    erw.statusCode = statusCode
+    erw.w.WriteHeader(statusCode)
+}
+
+func (erw *extendedResponseWriter) Write(data []byte) (int, error) {
+    erw.bytes = len(data)
+    return erw.w.Write(data)
+}
+
 
 type Response[T any] struct {
     Resources   []T     `json:"resources"`
@@ -32,9 +56,13 @@ type ResponseV2[T any] struct {
 // logs http requests
 func logHandler(handler http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        log.Printf("received request: %s %s %s", r.RemoteAddr, r.Method, r.URL)
-        w.Header().Set("X-Request-ID", uuid.V4())
-	    handler.ServeHTTP(w, r)
+        time := time.Now().Format("[02/Jan/2006:15:04:05 -0700]")
+        clientIp := strings.Trim(r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")], "[]")
+        log.Printf("received request: %s %s %s", clientIp, r.Method, r.URL)
+        erw := &extendedResponseWriter{w: w}
+        erw.Header().Set("X-Request-ID", uuid.V4())
+	    handler.ServeHTTP(erw, r)
+        log.Printf("completed request: %s - %s \"%s %s %s\" %d %d", clientIp, time, r.Method, r.URL.Path, r.Proto, erw.statusCode, erw.bytes)
     })
 }
 
